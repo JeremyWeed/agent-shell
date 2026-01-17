@@ -1155,10 +1155,10 @@ code block content
                            "Yesterday, 15:45")))
           ;; Same year, older
           (should (string-match-p "^[A-Z][a-z]+ [0-9]+, [0-9]+:[0-9]+"
-                                   (agent-shell--format-session-date "2026-01-05T09:00:00Z")))
+                                  (agent-shell--format-session-date "2026-01-05T09:00:00Z")))
           ;; Different year
           (should (string-match-p "^[A-Z][a-z]+ [0-9]+, [0-9]\\{4\\}"
-                                   (agent-shell--format-session-date "2025-06-15T12:00:00Z")))
+                                  (agent-shell--format-session-date "2025-06-15T12:00:00Z")))
           ;; Invalid input falls back gracefully
           (should (equal (agent-shell--format-session-date "not-a-date")
                          "not-a-date")))
@@ -1364,6 +1364,62 @@ code block content
     (should (string-match-p "\\*\\*Parameters:\\*\\*" entry))
     (should (string-match-p "filePath: /home/user/test.txt" entry))
     (should (string-match-p "offset: 100" entry))))
+;;; TRAMP Support Tests
+
+(ert-deftest agent-shell--tramp-command-runner-local-path-test ()
+  "Test that command runner returns nil for local paths."
+  (with-temp-buffer
+    (setq default-directory "/tmp/local-project/")
+    (should (null (agent-shell--tramp-command-runner (current-buffer))))))
+
+(ert-deftest agent-shell--tramp-command-runner-ssh-path-test ()
+  "Test that command runner returns SSH command for TRAMP paths."
+  (require 'tramp)
+  (with-temp-buffer
+    (setq default-directory "/ssh:user@host:/project/")
+    (let ((result (agent-shell--tramp-command-runner (current-buffer))))
+      (should result)
+      (should (equal (car result) "ssh"))
+      (should (member "user@host" result))
+      (should (member "--" result)))))
+
+(ert-deftest agent-shell--tramp-command-runner-ssh-with-port-test ()
+  "Test that command runner includes -p flag for non-standard ports."
+  (require 'tramp)
+  (with-temp-buffer
+    (setq default-directory "/ssh:user@host#2222:/project/")
+    (let ((result (agent-shell--tramp-command-runner (current-buffer))))
+      (should result)
+      (should (member "-p" result))
+      (should (member "2222" result)))))
+
+(ert-deftest agent-shell--resolve-tramp-path-strip-prefix-test ()
+  "Test that resolver strips TRAMP prefix from paths."
+  (require 'tramp)
+  (should (equal (agent-shell--resolve-tramp-path "/ssh:host:/project/file.el")
+                 "/project/file.el")))
+
+(ert-deftest agent-shell--resolve-tramp-path-identity-test ()
+  "Test that resolver returns local paths unchanged when not in TRAMP context."
+  (let ((default-directory "/tmp/local/"))
+    (should (equal (agent-shell--resolve-tramp-path "/tmp/local/file.el")
+                   "/tmp/local/file.el"))))
+
+(ert-deftest agent-shell--local-temp-directory-local-test ()
+  "Test that local-temp-directory returns normal temp dir for local paths."
+  (let ((default-directory "/tmp/local/"))
+    (should (stringp (agent-shell--local-temp-directory)))
+    (should-not (string-prefix-p "/ssh:" (agent-shell--local-temp-directory)))))
+
+(ert-deftest agent-shell--local-temp-directory-tramp-test ()
+  "Test that local-temp-directory returns local path for TRAMP paths."
+  (require 'tramp)
+  (let ((default-directory "/ssh:host:/remote/"))
+    (let ((temp-dir (agent-shell--local-temp-directory)))
+      (should (stringp temp-dir))
+      (should-not (string-prefix-p "/ssh:" temp-dir))
+      ;; Should be under home directory
+      (should (string-prefix-p (expand-file-name "~") temp-dir)))))
 
 (ert-deftest agent-shell--session-column-value-test ()
   "Test `agent-shell--session-column-value' extracts correct values."

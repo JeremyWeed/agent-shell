@@ -1677,6 +1677,16 @@ For example:
   (setq agent-shell-path-resolver-function nil)
   (message "TRAMP support disabled for agent-shell"))
 
+(defun agent-shell--local-temp-directory ()
+  "Return a local temporary directory, even when `default-directory' is remote.
+This ensures temp files (like cached icons) are always stored locally."
+  (if (and (fboundp 'tramp-tramp-file-p)
+           (tramp-tramp-file-p default-directory))
+      ;; When in a TRAMP buffer, use local temp dir
+      ;; Prefer user's home for cross-platform compatibility (Windows has no /tmp)
+      (expand-file-name "tmp" (expand-file-name "~"))
+    (temporary-file-directory)))
+
 (defun agent-shell--get-devcontainer-workspace-path (cwd)
   "Return devcontainer workspaceFolder for CWD, or default value if none found.
 
@@ -2987,10 +2997,7 @@ Icon names starting with https:// are downloaded directly from that location."
                        ;; For lobe-icons names, use the original filename
                        (file-name-nondirectory url)))
            ;; Always use local temp directory, even when default-directory is remote
-           (local-temp-dir (if (and (fboundp 'tramp-tramp-file-p)
-                                    (tramp-tramp-file-p default-directory))
-                               (or (getenv "TMPDIR") "/tmp")
-                             (temporary-file-directory)))
+           (local-temp-dir (agent-shell--local-temp-directory))
            (cache-dir (file-name-concat local-temp-dir "agent-shell" mode))
            (cache-path (expand-file-name filename cache-dir)))
       (unless (file-exists-p cache-path)
@@ -3016,7 +3023,9 @@ Return file path of the generated SVG."
     (let* ((icon-text (char-to-string (string-to-char icon-name)))
            (mode (if (eq (frame-parameter nil 'background-mode) 'dark) "dark" "light"))
            (filename (format "%s-%s.svg" icon-name width))
-           (cache-dir (file-name-concat (temporary-file-directory) "agent-shell" mode))
+           ;; Always use local temp directory, even when default-directory is remote
+           (local-temp-dir (agent-shell--local-temp-directory))
+           (cache-dir (file-name-concat local-temp-dir "agent-shell" mode))
            (cache-path (expand-file-name filename cache-dir))
            (font-size (* 0.7 width))
            (x (/ width 2))
