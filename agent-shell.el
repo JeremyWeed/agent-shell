@@ -4229,8 +4229,22 @@ When nil, transcript saving is disabled."
 
 For example:
 
- project/.agent-shell/transcripts/."
-  (let* ((dir (expand-file-name ".agent-shell/transcripts" (agent-shell-cwd)))
+ project/.agent-shell/transcripts/.
+
+For TRAMP paths, saves locally in ~/.agent-shell/transcripts/<host>/<remote-path>/."
+  (let* ((cwd (agent-shell-cwd))
+         (dir (if (and (fboundp 'tramp-tramp-file-p)
+                       (tramp-tramp-file-p cwd))
+                  ;; For TRAMP paths, save transcripts locally
+                  (let* ((vec (tramp-dissect-file-name cwd))
+                         (host (tramp-file-name-host vec))
+                         (localname (tramp-file-name-localname vec))
+                         ;; Sanitize path for use as directory name
+                         (safe-path (replace-regexp-in-string "/" "_" (string-trim localname "/"))))
+                    (expand-file-name (format ".agent-shell/transcripts/%s/%s" host safe-path)
+                                      (expand-file-name "~")))
+                ;; Local paths use project root as before
+                (expand-file-name ".agent-shell/transcripts" cwd)))
          (filename (format-time-string "%F-%H-%M-%S.md"))
          (filepath (expand-file-name filename dir)))
     filepath))
