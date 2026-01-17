@@ -1415,11 +1415,28 @@ code block content
   "Test that local-temp-directory returns local path for TRAMP paths."
   (require 'tramp)
   (let ((default-directory "/ssh:host:/remote/"))
-    (let ((temp-dir (agent-shell--local-temp-directory)))
+    (let ((temp-dir (expand-file-name (agent-shell--local-temp-directory))))
       (should (stringp temp-dir))
       (should-not (string-prefix-p "/ssh:" temp-dir))
-      ;; Should be under home directory
-      (should (string-prefix-p (expand-file-name "~") temp-dir)))))
+      ;; Should be under Emacs user directory
+      (should (string-prefix-p (expand-file-name user-emacs-directory) temp-dir)))))
+
+(ert-deftest agent-shell--tramp-command-runner-multihop-error-test ()
+  "Test that multi-hop TRAMP paths produce an error."
+  (require 'tramp)
+  (cl-letf (((symbol-function 'agent-shell-cwd)
+             (lambda () "/ssh:jump|ssh:target:/remote/path/")))
+    (with-temp-buffer
+      (should-error (agent-shell--tramp-command-runner (current-buffer))
+                    :type 'error))))
+
+(ert-deftest agent-shell--tramp-command-runner-unsupported-method-error-test ()
+  "Test that unsupported TRAMP methods produce an error."
+  (require 'tramp)
+  (with-temp-buffer
+    (setq-local default-directory "/sudo:root@localhost:/root/")
+    (should-error (agent-shell--tramp-command-runner (current-buffer))
+                  :type 'error)))
 
 (ert-deftest agent-shell--session-column-value-test ()
   "Test `agent-shell--session-column-value' extracts correct values."

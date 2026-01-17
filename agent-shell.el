@@ -1619,6 +1619,7 @@ function before returning."
 (declare-function tramp-file-name-user "tramp")
 (declare-function tramp-file-name-host "tramp")
 (declare-function tramp-file-name-port "tramp")
+(declare-function tramp-file-name-hop "tramp")
 (declare-function tramp-file-name-localname "tramp")
 (declare-function tramp-make-tramp-file-name "tramp")
 
@@ -1637,6 +1638,8 @@ Returns nil for non-TRAMP buffers, allowing local execution."
                (port (tramp-file-name-port vec)))
           (unless (member method '("ssh" "scp" nil))
             (error "TRAMP method '%s' not supported; only SSH is supported" method))
+          (when (tramp-file-name-hop vec)
+            (error "Multi-hop TRAMP paths not supported"))
           (append
            (list "ssh")
            (when port (list "-p" port))
@@ -1682,9 +1685,8 @@ For example:
 This ensures temp files (like cached icons) are always stored locally."
   (if (and (fboundp 'tramp-tramp-file-p)
            (tramp-tramp-file-p default-directory))
-      ;; When in a TRAMP buffer, use local temp dir
-      ;; Prefer user's home for cross-platform compatibility (Windows has no /tmp)
-      (expand-file-name "tmp" (expand-file-name "~"))
+      ;; When in a TRAMP buffer, use Emacs-standard cache directory
+      (locate-user-emacs-file "agent-shell/cache/")
     (temporary-file-directory)))
 
 (defun agent-shell--get-devcontainer-workspace-path (cwd)
