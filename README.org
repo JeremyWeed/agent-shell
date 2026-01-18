@@ -493,6 +493,7 @@ When TRAMP support is enabled:
 - *SSH-only*: Only =ssh= and =scp= TRAMP methods are supported. Docker, sudo, and other methods will error.
 - *Multi-hop not supported*: Paths like =/ssh:gateway|ssh:target:/path= are not currently supported.
 - *Environment variables*: Must be configured on the remote machine, not passed from Emacs.
+- *Session data is local*: To avoid TRAMP write latency.
 
 *** Per-project configuration
 
