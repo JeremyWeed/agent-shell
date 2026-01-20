@@ -1175,74 +1175,12 @@ If the buffer's file has changed, prompt the user to reload it."
   "Resolve PATH using `agent-shell-path-resolver-function'."
   (funcall (or agent-shell-path-resolver-function #'identity) path))
 
-;;; TRAMP Support (experimental)
-
-(declare-function tramp-tramp-file-p "tramp")
-(declare-function tramp-dissect-file-name "tramp")
-(declare-function tramp-file-name-method "tramp")
-(declare-function tramp-file-name-user "tramp")
-(declare-function tramp-file-name-host "tramp")
-(declare-function tramp-file-name-port "tramp")
-(declare-function tramp-file-name-hop "tramp")
-(declare-function tramp-file-name-localname "tramp")
-(declare-function tramp-make-tramp-file-name "tramp")
-
-(defun agent-shell--tramp-command-runner (buffer)
-  "Return command prefix for running commands on TRAMP remote host.
-BUFFER is the agent-shell buffer.
-Returns nil for non-TRAMP buffers, allowing local execution."
-  (require 'tramp)
-  (with-current-buffer buffer
-    (let ((cwd (agent-shell-cwd)))
-      (when (tramp-tramp-file-p cwd)
-        (let* ((vec (tramp-dissect-file-name cwd))
-               (method (tramp-file-name-method vec))
-               (user (tramp-file-name-user vec))
-               (host (tramp-file-name-host vec))
-               (port (tramp-file-name-port vec)))
-          (unless (member method '("ssh" "scp" nil))
-            (error "TRAMP method '%s' not supported; only SSH is supported" method))
-          (when (tramp-file-name-hop vec)
-            (error "Multi-hop TRAMP paths not supported"))
-          (append
-           (list "ssh")
-           (when port (list "-p" port))
-           (list (if user (format "%s@%s" user host) host))
-           (list "--")))))))
-
-(defun agent-shell--resolve-tramp-path (path)
-  "Resolve PATH between TRAMP format and remote-local format.
-
-For example:
-- /ssh:host:/project/README.md => /project/README.md
-- /project/README.md => /ssh:host:/project/README.md"
-  (require 'tramp)
-  (let* ((cwd (agent-shell-cwd))
-         (tramp-vec (and (tramp-tramp-file-p cwd)
-                         (tramp-dissect-file-name cwd))))
-    (cond
-     ;; Path is already a TRAMP path - strip the prefix for the agent
-     ((tramp-tramp-file-p path)
-      (tramp-file-name-localname (tramp-dissect-file-name path)))
-     ;; Path is a remote-local path - add TRAMP prefix for Emacs
-     (tramp-vec
-      (tramp-make-tramp-file-name tramp-vec path))
-     ;; Not in a TRAMP context
-     (t path))))
-
-(defun agent-shell-enable-tramp-support ()
-  "Enable TRAMP support for agent-shell (experimental)."
-  (interactive)
-  (setq agent-shell-container-command-runner #'agent-shell--tramp-command-runner)
-  (setq agent-shell-path-resolver-function #'agent-shell--resolve-tramp-path)
-  (message "TRAMP support enabled for agent-shell"))
-
-(defun agent-shell-disable-tramp-support ()
-  "Disable TRAMP support for agent-shell."
-  (interactive)
-  (setq agent-shell-container-command-runner nil)
-  (setq agent-shell-path-resolver-function nil)
-  (message "TRAMP support disabled for agent-shell"))
+;; TRAMP support is in agent-shell-tramp.el
+(declare-function agent-shell--tramp-transcript-dir "agent-shell-tramp")
+(autoload 'agent-shell-enable-tramp-support "agent-shell-tramp"
+  "Enable TRAMP support for agent-shell (experimental)." t)
+(autoload 'agent-shell-disable-tramp-support "agent-shell-tramp"
+  "Disable TRAMP support for agent-shell." t)
 
 (defun agent-shell--local-temp-directory ()
   "Return a local temporary directory, even when `default-directory' is remote.
@@ -4244,18 +4182,9 @@ For example:
 
 For TRAMP paths, saves locally in ~/.agent-shell/transcripts/<host>/<remote-path>/."
   (let* ((cwd (agent-shell-cwd))
-         (dir (if (and (fboundp 'tramp-tramp-file-p)
-                       (tramp-tramp-file-p cwd))
-                  ;; For TRAMP paths, save transcripts locally
-                  (let* ((vec (tramp-dissect-file-name cwd))
-                         (host (tramp-file-name-host vec))
-                         (localname (tramp-file-name-localname vec))
-                         ;; Sanitize path for use as directory name
-                         (safe-path (replace-regexp-in-string "/" "_" (string-trim localname "/"))))
-                    (expand-file-name (format ".agent-shell/transcripts/%s/%s" host safe-path)
-                                      (expand-file-name "~")))
-                ;; Local paths use project root as before
-                (expand-file-name ".agent-shell/transcripts" cwd)))
+         (dir (or (agent-shell--tramp-transcript-dir cwd)
+                  ;; Local paths use project root as before
+                  (expand-file-name ".agent-shell/transcripts" cwd)))
          (filename (format-time-string "%F-%H-%M-%S.md"))
          (filepath (expand-file-name filename dir)))
     filepath))
