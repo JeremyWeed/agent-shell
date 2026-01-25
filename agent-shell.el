@@ -132,11 +132,14 @@ When non-nil, user message sections are expanded."
   :type 'boolean
   :group 'agent-shell)
 
-(defcustom agent-shell-path-resolver-function nil
+(autoload 'agent-shell--resolve-tramp-path "agent-shell-tramp")
+
+(defcustom agent-shell-path-resolver-function #'agent-shell--resolve-tramp-path
   "Function for resolving remote paths on the local file-system, and vice versa.
 
 Expects a function that takes the path as its single argument, and
-returns the resolved path.  Set to nil to disable mapping."
+returns the resolved path.  The default handles TRAMP paths automatically.
+Set to nil or #\\='identity to disable path resolution."
   :type 'function
   :group 'agent-shell)
 
@@ -145,7 +148,10 @@ returns the resolved path.  Set to nil to disable mapping."
 
 When non-nil, both the agent command and shell commands will be
 executed using this runner.  Can be a list of strings or a function
-that takes a buffer and returns a list.
+that takes a buffer and returns a list (or nil for local execution).
+
+Note: TRAMP remote execution is handled automatically via Emacs'
+file-handler mechanism and does not require this setting.
 
 Example for static devcontainer:
   \\='(\"devcontainer\" \"exec\" \"--workspace-folder\" \".\")
@@ -163,7 +169,7 @@ Example for per-session containers:
     (if (string-match \"project-a\" (buffer-name buffer))
         \\='(\"docker\" \"exec\" \"project-a-dev\" \"--\")
       \\='(\"docker\" \"exec\" \"project-b-dev\" \"--\")))"
-  :type '(choice (repeat string) function)
+  :type '(choice (const nil) (repeat string) function)
   :group 'agent-shell)
 
 (defcustom agent-shell-section-functions nil
@@ -1613,10 +1619,6 @@ function before returning."
 
 ;; TRAMP support is in agent-shell-tramp.el
 (declare-function agent-shell--tramp-transcript-dir "agent-shell-tramp")
-(autoload 'agent-shell-enable-tramp-support "agent-shell-tramp"
-  "Enable TRAMP support for agent-shell (experimental)." t)
-(autoload 'agent-shell-disable-tramp-support "agent-shell-tramp"
-  "Disable TRAMP support for agent-shell." t)
 
 (defun agent-shell--local-temp-directory ()
   "Return a local temporary directory, even when `default-directory' is remote.

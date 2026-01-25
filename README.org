@@ -490,28 +490,13 @@ All of the above settings can be applied on a per-project basis using [[https://
 
 ** Running agents on remote hosts via TRAMP (Experimental)
 
-=agent-shell= supports running agents on remote hosts accessed via TRAMP. When you open a project on a remote machine (e.g., =/ssh:user@host:/path/to/project=), the agent can run on that remote machine.
-
-*** Enabling TRAMP support
-
-#+begin_src emacs-lisp
-;; Add to your init.el, or call interactively with M-x
-(agent-shell-enable-tramp-support)
-#+end_src
-
-Or add to your =use-package= configuration:
-
-#+begin_src emacs-lisp
-(use-package agent-shell
-  :config
-  (agent-shell-enable-tramp-support))
-#+end_src
+=agent-shell= supports running agents on remote hosts accessed via TRAMP. When you open a project on a remote machine (e.g., =/ssh:user@host:/path/to/project=), the agent automatically runs on that remote machine via Emacs' file-handler mechanism.
 
 *** How it works
 
-When TRAMP support is enabled:
-- The agent runs on the remote host via SSH
-- File paths are automatically converted between TRAMP format and remote-local format
+When the working directory is a TRAMP path:
+- The agent runs on the remote host automatically
+- File paths are converted between TRAMP format and remote-local format
 - Transcripts are saved locally in =~/.agent-shell/transcripts/<host>/<path>/=
 
 *** Requirements
@@ -520,27 +505,9 @@ When TRAMP support is enabled:
 2. *SSH key-based authentication recommended* - interactive password prompts may not work
 3. *Remote shell must have correct PATH* - ensure your remote =.bashrc= sets up PATH for non-interactive shells
 
-*** Disabling TRAMP support
-
-#+begin_src emacs-lisp
-(agent-shell-disable-tramp-support)
-#+end_src
-
 *** Known limitations
 
-- *SSH-only*: Only =ssh= and =scp= TRAMP methods are supported. Docker, sudo, and other methods will error.
-- *Multi-hop not supported*: Paths like =/ssh:gateway|ssh:target:/path= are not currently supported.
-- *Environment variables*: Must be configured on the remote machine, not passed from Emacs.
-- *Session data is local*: To avoid TRAMP write latency.
-
-*** Per-project configuration
-
-You can enable TRAMP support on a per-project basis using [[https://www.gnu.org/software/emacs/manual/html_node/emacs/Directory-Variables.html][directory-local variables]]:
-
-#+begin_src emacs-lisp
-;; .dir-locals.el in your remote project
-((nil . ((eval . (agent-shell-enable-tramp-support)))))
-#+end_src
+- *Session data is local*: Transcripts are saved locally to avoid TRAMP write latency.
 
 ** Keybindings
 
