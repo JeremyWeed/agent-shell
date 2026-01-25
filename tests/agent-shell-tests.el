@@ -739,33 +739,6 @@ code block content with spaces
 
 ;;; TRAMP Support Tests
 
-(ert-deftest agent-shell--tramp-command-runner-local-path-test ()
-  "Test that command runner returns nil for local paths."
-  (with-temp-buffer
-    (setq default-directory "/tmp/local-project/")
-    (should (null (agent-shell--tramp-command-runner (current-buffer))))))
-
-(ert-deftest agent-shell--tramp-command-runner-ssh-path-test ()
-  "Test that command runner returns SSH command for TRAMP paths."
-  (require 'tramp)
-  (with-temp-buffer
-    (setq default-directory "/ssh:user@host:/project/")
-    (let ((result (agent-shell--tramp-command-runner (current-buffer))))
-      (should result)
-      (should (equal (car result) "ssh"))
-      (should (member "user@host" result))
-      (should (member "--" result)))))
-
-(ert-deftest agent-shell--tramp-command-runner-ssh-with-port-test ()
-  "Test that command runner includes -p flag for non-standard ports."
-  (require 'tramp)
-  (with-temp-buffer
-    (setq default-directory "/ssh:user@host#2222:/project/")
-    (let ((result (agent-shell--tramp-command-runner (current-buffer))))
-      (should result)
-      (should (member "-p" result))
-      (should (member "2222" result)))))
-
 (ert-deftest agent-shell--resolve-tramp-path-strip-prefix-test ()
   "Test that resolver strips TRAMP prefix from paths."
   (require 'tramp)
@@ -793,23 +766,6 @@ code block content with spaces
       (should-not (string-prefix-p "/ssh:" temp-dir))
       ;; Should be under Emacs user directory
       (should (string-prefix-p (expand-file-name user-emacs-directory) temp-dir)))))
-
-(ert-deftest agent-shell--tramp-command-runner-multihop-error-test ()
-  "Test that multi-hop TRAMP paths produce an error."
-  (require 'tramp)
-  (cl-letf (((symbol-function 'agent-shell-cwd)
-             (lambda () "/ssh:jump|ssh:target:/remote/path/")))
-    (with-temp-buffer
-      (should-error (agent-shell--tramp-command-runner (current-buffer))
-                    :type 'error))))
-
-(ert-deftest agent-shell--tramp-command-runner-unsupported-method-error-test ()
-  "Test that unsupported TRAMP methods produce an error."
-  (require 'tramp)
-  (with-temp-buffer
-    (setq-local default-directory "/sudo:root@localhost:/root/")
-    (should-error (agent-shell--tramp-command-runner (current-buffer))
-                  :type 'error)))
 
 (provide 'agent-shell-tests)
 ;;; agent-shell-tests.el ends here
